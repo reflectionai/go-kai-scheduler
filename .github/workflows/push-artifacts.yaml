@@ -56,6 +56,16 @@ jobs:
       - name: Docker build & push
         run: make build DOCKER_BUILD_PLATFORM=linux/amd64,linux/arm64 DOCKER_REPO_BASE=${{ env.DOCKER_REGISTRY }} VERSION=$PACKAGE_VERSION DOCKER_BUILDX_ADDITIONAL_ARGS=--push
 
+      - name: Tag images as latest
+        if: github.ref == 'refs/heads/main'
+        run: |
+          SERVICES="podgrouper scheduler binder resourcereservation snapshot-tool scalingpod nodescaleadjuster podgroupcontroller queuecontroller fairshare-simulator admission operator time-based-fairshare-simulator crd-upgrader"
+          for SERVICE in $SERVICES; do
+            docker buildx imagetools create \
+              --tag ${{ env.DOCKER_REGISTRY }}/${SERVICE}:latest \
+              ${{ env.DOCKER_REGISTRY }}/${SERVICE}:$PACKAGE_VERSION
+          done
+
       - name: Build helm chart
         run: |
           sed -i 's#registry/local/kai-scheduler#${{ env.DOCKER_REGISTRY }}#' deployments/kai-scheduler/values.yaml
