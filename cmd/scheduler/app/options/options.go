@@ -40,6 +40,7 @@ const (
 	DefaultPyroscopeMutexProfilerRate  = 5
 	DefaultPyroscopeBlockProfilerRate  = 5
 	defaultNumOfStatusRecordingWorkers = 5
+	defaultPluginServerBindAddress     = "127.0.0.1"
 )
 
 // ServerOption is the main context object for the controller manager.
@@ -71,6 +72,7 @@ type ServerOption struct {
 	NumOfStatusRecordingWorkers       int
 	GlobalDefaultStalenessGracePeriod time.Duration
 	PluginServerPort                  int
+	PluginServerBindAddress           string
 	CPUWorkerNodeLabelKey             string
 	GPUWorkerNodeLabelKey             string
 	MIGWorkerNodeLabelKey             string
@@ -126,6 +128,7 @@ func (s *ServerOption) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.NumOfStatusRecordingWorkers, "num-of-status-recording-workers", defaultNumOfStatusRecordingWorkers, "specifies the max number of go routines spawned to update pod and podgroups conditions and events. Defaults to 5")
 	fs.DurationVar(&s.GlobalDefaultStalenessGracePeriod, "default-staleness-grace-period", defaultStalenessGracePeriod, "Global default staleness grace period duration. Negative values means infinite. Defaults to 60s")
 	fs.IntVar(&s.PluginServerPort, "plugin-server-port", 8081, "The port to bind for plugin server requests")
+	fs.StringVar(&s.PluginServerBindAddress, "plugin-server-bind-address", defaultPluginServerBindAddress, "The address to bind for plugin server requests")
 	fs.StringVar(&s.CPUWorkerNodeLabelKey, "cpu-worker-node-label-key", constants.DefaultCPUWorkerNodeLabelKey, "The label key for CPU worker nodes")
 	fs.StringVar(&s.GPUWorkerNodeLabelKey, "gpu-worker-node-label-key", constants.DefaultGPUWorkerNodeLabelKey, "The label key for GPU worker nodes")
 	fs.StringVar(&s.MIGWorkerNodeLabelKey, "mig-worker-node-label-key", constants.DefaultMIGWorkerNodeLabelKey, "The label key for MIG enabled worker nodes")

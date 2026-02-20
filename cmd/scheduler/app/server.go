@@ -106,7 +106,7 @@ func RunApp() error {
 
 	mux := http.NewServeMux()
 	go func() {
-		_ = http.ListenAndServe(fmt.Sprintf("127.0.0.1:%d", so.PluginServerPort), mux)
+		_ = http.ListenAndServe(fmt.Sprintf("%s:%d", so.PluginServerBindAddress, so.PluginServerPort), mux)
 	}()
 
 	setupProfiling(so)
