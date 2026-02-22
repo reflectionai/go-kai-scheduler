@@ -71,6 +71,11 @@ type GlobalConfig struct {
 	// JSONLog switches all services to JSON-formatted logging
 	// +kubebuilder:validation:Optional
 	JSONLog *bool `json:"jsonLog,omitempty"`
+
+	// ServiceAnnotations are additional annotations applied to all operator-managed Kubernetes Services.
+	// This is useful for metrics discovery (e.g., Datadog/Prometheus autodiscovery annotations).
+	// +kubebuilder:validation:Optional
+	ServiceAnnotations map[string]string `json:"serviceAnnotations,omitempty"`
 }
 
 func (g *GlobalConfig) SetDefaultWhereNeeded() {

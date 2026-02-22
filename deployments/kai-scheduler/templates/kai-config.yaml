@@ -23,6 +23,10 @@ spec:
     {{- if .Values.global.jsonLog }}
     jsonLog: true
     {{- end }}
+    {{- if .Values.global.serviceAnnotations }}
+    serviceAnnotations:
+      {{- toYaml .Values.global.serviceAnnotations | nindent 6 }}
+    {{- end }}
     {{- if .Values.global.affinity }}
     affinity:
       {{- toYaml .Values.global.affinity | nindent 6 }}

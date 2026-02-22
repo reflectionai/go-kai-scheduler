@@ -215,6 +215,20 @@ func AddK8sClientConfigToArgs(k8sClientConfig *kaiv1common.K8sClientConfig, args
 	}
 }
 
+// ApplyServiceAnnotations applies global service annotations to a Service.
+// If the annotations map is nil or empty, this is a no-op.
+func ApplyServiceAnnotations(service *v1.Service, annotations map[string]string) {
+	if len(annotations) == 0 {
+		return
+	}
+	if service.Annotations == nil {
+		service.Annotations = map[string]string{}
+	}
+	for k, v := range annotations {
+		service.Annotations[k] = v
+	}
+}
+
 func CheckCRDsAvailable(ctx context.Context, client client.Reader, crdNames ...string) (bool, error) {
 	for _, name := range crdNames {
 		crd := &metav1.PartialObjectMetadata{

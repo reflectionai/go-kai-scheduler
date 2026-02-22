@@ -114,6 +114,10 @@ func (p *PodGroupController) serviceForKAIConfig(
 		"app": p.BaseResourceName,
 	}
 
+	if kaiConfig.Spec.Global != nil {
+		common.ApplyServiceAnnotations(service, kaiConfig.Spec.Global.ServiceAnnotations)
+	}
+
 	return []client.Object{service}, nil
 }
 

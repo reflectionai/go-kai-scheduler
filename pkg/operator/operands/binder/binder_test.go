@@ -196,6 +196,23 @@ var _ = Describe("Binder", func() {
 			})
 		})
 
+		Context("Service Annotations", func() {
+			It("should apply global ServiceAnnotations to the Service", func(ctx context.Context) {
+				kaiConfig.Spec.Global.ServiceAnnotations = map[string]string{
+					"prometheus.io/scrape": "true",
+					"prometheus.io/port":   "8080",
+				}
+				objects, err := b.DesiredState(ctx, fakeKubeClient, kaiConfig)
+				Expect(err).To(BeNil())
+
+				serviceT := test_utils.FindTypeInObjects[*v1.Service](objects)
+				Expect(serviceT).NotTo(BeNil())
+				service := *serviceT
+				Expect(service.Annotations).To(HaveKeyWithValue("prometheus.io/scrape", "true"))
+				Expect(service.Annotations).To(HaveKeyWithValue("prometheus.io/port", "8080"))
+			})
+		})
+
 		Context("Reservation Service Account", func() {
 			It("will not remove current image pull secrets", func(ctx context.Context) {
 				kaiConfig.Spec.Global.ImagePullSecrets = []string{"test-secret"}

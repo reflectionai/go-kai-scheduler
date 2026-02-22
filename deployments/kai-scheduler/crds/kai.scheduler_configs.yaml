@@ -3234,6 +3234,9 @@ spec:
                           type: string
                       type: object
                     type: array
+                  jsonLog:
+                    description: JSONLog switches all services to JSON-formatted logging
+                    type: boolean
                   namespaceLabelSelector:
                     additionalProperties:
                       type: string
@@ -3465,6 +3468,13 @@ spec:
                               PodSecurityContext, the value specified in SecurityContext takes precedence.
                             type: string
                         type: object
+                    type: object
+                  serviceAnnotations:
+                    additionalProperties:
+                      type: string
+                    description: |-
+                      ServiceAnnotations are additional annotations applied to all operator-managed Kubernetes Services.
+                      This is useful for metrics discovery (e.g., Datadog/Prometheus autodiscovery annotations).
                     type: object
                   tolerations:
                     description: Tolerations defines tolerations for KAI operators

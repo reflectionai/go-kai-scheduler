@@ -84,3 +84,22 @@ parseable log levels are needed, enable JSON logging via the Helm value:
 ```bash
 helm install kai-scheduler kai-scheduler --set global.jsonLog=true
 ```
+
+### Service Annotations
+
+To add custom annotations to all operator-managed Services (e.g., for Datadog or
+Prometheus autodiscovery), set `global.serviceAnnotations`:
+
+```bash
+helm install kai-scheduler kai-scheduler \
+  --set global.serviceAnnotations."prometheus\.io/scrape"="true"
+```
+
+Or in `values.yaml`:
+
+```yaml
+global:
+  serviceAnnotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+```

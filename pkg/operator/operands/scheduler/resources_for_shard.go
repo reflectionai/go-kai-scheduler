@@ -224,6 +224,10 @@ func (s *SchedulerForShard) serviceForShard(
 	}
 	service.Annotations["prometheus.io/scrape"] = "true"
 
+	if kaiConfig.Spec.Global != nil {
+		common.ApplyServiceAnnotations(service, kaiConfig.Spec.Global.ServiceAnnotations)
+	}
+
 	service.Spec.ClusterIP = "None"
 	service.Spec.Ports = []corev1.ServicePort{
 		{

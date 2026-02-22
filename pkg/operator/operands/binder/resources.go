@@ -112,6 +112,10 @@ func (b *Binder) serviceForKAIConfig(
 	service.Spec.SessionAffinity = v1.ServiceAffinityNone
 	service.Spec.Type = v1.ServiceTypeClusterIP
 
+	if kaiConfig.Spec.Global != nil {
+		common.ApplyServiceAnnotations(service, kaiConfig.Spec.Global.ServiceAnnotations)
+	}
+
 	return []client.Object{service}, nil
 }
 

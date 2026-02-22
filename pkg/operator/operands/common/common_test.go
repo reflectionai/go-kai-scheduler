@@ -332,6 +332,65 @@ var _ = Describe("AllObjectsExists", func() {
 	})
 })
 
+var _ = Describe("ApplyServiceAnnotations", func() {
+	It("should be a no-op when annotations map is nil", func() {
+		service := &v1.Service{}
+		ApplyServiceAnnotations(service, nil)
+		Expect(service.Annotations).To(BeNil())
+	})
+
+	It("should be a no-op when annotations map is empty", func() {
+		service := &v1.Service{}
+		ApplyServiceAnnotations(service, map[string]string{})
+		Expect(service.Annotations).To(BeNil())
+	})
+
+	It("should apply annotations to a service with nil annotations", func() {
+		service := &v1.Service{}
+		annotations := map[string]string{
+			"prometheus.io/scrape": "true",
+			"prometheus.io/port":   "8080",
+		}
+		ApplyServiceAnnotations(service, annotations)
+		Expect(service.Annotations).To(HaveLen(2))
+		Expect(service.Annotations).To(HaveKeyWithValue("prometheus.io/scrape", "true"))
+		Expect(service.Annotations).To(HaveKeyWithValue("prometheus.io/port", "8080"))
+	})
+
+	It("should merge annotations with existing service annotations", func() {
+		service := &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					"existing-key": "existing-value",
+				},
+			},
+		}
+		annotations := map[string]string{
+			"new-key": "new-value",
+		}
+		ApplyServiceAnnotations(service, annotations)
+		Expect(service.Annotations).To(HaveLen(2))
+		Expect(service.Annotations).To(HaveKeyWithValue("existing-key", "existing-value"))
+		Expect(service.Annotations).To(HaveKeyWithValue("new-key", "new-value"))
+	})
+
+	It("should allow global annotations to override existing annotations", func() {
+		service := &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					"prometheus.io/scrape": "false",
+				},
+			},
+		}
+		annotations := map[string]string{
+			"prometheus.io/scrape": "true",
+		}
+		ApplyServiceAnnotations(service, annotations)
+		Expect(service.Annotations).To(HaveLen(1))
+		Expect(service.Annotations).To(HaveKeyWithValue("prometheus.io/scrape", "true"))
+	})
+})
+
 var _ = Describe("MergeAffinities", func() {
 	It("should return globalAffinity when localAffinity is nil", func() {
 		globalAffinity := &v1.Affinity{

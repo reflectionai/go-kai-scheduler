@@ -17,6 +17,13 @@ global:
   namespaceLabelSelector: {}
   podLabelSelector: {}
   jsonLog: false
+  # serviceAnnotations are applied to all operator-managed Kubernetes Services.
+  # Useful for metrics autodiscovery (e.g., Datadog, Prometheus).
+  # Example:
+  #   serviceAnnotations:
+  #     prometheus.io/scrape: "true"
+  #     prometheus.io/port: "8080"
+  serviceAnnotations: {}
   resourceReservation:
     namespace: kai-resource-reservation
     serviceAccount: kai-resource-reservation
