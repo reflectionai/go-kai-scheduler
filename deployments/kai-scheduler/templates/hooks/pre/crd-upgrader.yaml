@@ -28,6 +28,10 @@ spec:
         runAsNonRoot: true
         fsGroup: 10000
       {{- end }}
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
       - name: upgrader
         image: "{{ .Values.global.registry }}/{{ .Values.crdupgrader.image.name }}:{{ .Values.crdupgrader.image.tag | default .Values.global.tag | default .Chart.AppVersion }}"
