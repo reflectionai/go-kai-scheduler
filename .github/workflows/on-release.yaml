@@ -8,7 +8,7 @@ on:
       - created
 
 env:
-  DOCKER_REGISTRY: "ghcr.io/reflectionai/go-kai-scheduler"
+  DOCKER_REGISTRY: "us-central1-docker.pkg.dev/reflectionai/go-kai-scheduler"
 
 jobs:
   build-and-push:
