@@ -171,8 +171,14 @@ func hash(s string) uint32 {
 
 func InitLoggers(logLevel int, jsonLog bool) error {
 	if err := zap.RegisterEncoder("sessionID", func(cfg zapcore.EncoderConfig) (zapcore.Encoder, error) {
+		var baseEncoder zapcore.Encoder
+		if jsonLog {
+			baseEncoder = zapcore.NewJSONEncoder(cfg)
+		} else {
+			baseEncoder = zapcore.NewConsoleEncoder(cfg)
+		}
 		return &sessionIDEncoder{
-			Encoder: zapcore.NewConsoleEncoder(cfg),
+			Encoder: baseEncoder,
 			jsonLog: jsonLog,
 		}, nil
 	}); err != nil {
