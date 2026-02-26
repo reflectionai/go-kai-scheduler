@@ -101,7 +101,15 @@ func (rg *RayGrouper) getPodGroupMetadataWithClusterNamePath(
 func assignRayPodToSubGroup(pod *v1.Pod, pgMetadata *podgroup.Metadata) error {
 	group, found := pod.Labels[utils.RayNodeGroupLabelKey]
 	if !found {
-		return fmt.Errorf("ray node group label (%s) not found on pod %s/%s", utils.RayNodeGroupLabelKey, pod.Namespace, pod.Name)
+		// Pod lacks the Ray node group label (e.g. RayJob submitter pod).
+		// Assign it to the "default" catch-all subGroup.
+		for _, subGroup := range pgMetadata.SubGroups {
+			if subGroup.Name == "default" {
+				subGroup.PodsReferences = append(subGroup.PodsReferences, pod.Name)
+				return nil
+			}
+		}
+		return fmt.Errorf("default subgroup not found in pod group metadata for non-ray pod %s/%s", pod.Namespace, pod.Name)
 	}
 
 	for _, subGroup := range pgMetadata.SubGroups {
@@ -224,6 +232,13 @@ func calcJobNumOfPodsAndSubGroups(topOwner *unstructured.Unstructured) (int32, [
 			MinAvailable: workerGroupMinReplicas,
 		})
 	}
+
+	// Append a catch-all "default" subGroup for non-Ray pods (e.g. RayJob submitter).
+	// minAvailable: 0 ensures it doesn't affect gang scheduling.
+	subGroups = append(subGroups, &podgroup.SubGroupMetadata{
+		Name:         "default",
+		MinAvailable: 0,
+	})
 
 	return minReplicas, subGroups, nil
 }

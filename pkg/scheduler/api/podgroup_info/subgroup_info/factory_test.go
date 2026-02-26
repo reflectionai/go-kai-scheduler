@@ -266,6 +266,26 @@ func TestFromPodGroup_FullTree(t *testing.T) {
 			},
 		},
 		{
+			name: "leaf subgroup with MinMember 0",
+			podGroup: &v2alpha2.PodGroup{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "ns-zero", Name: "jobZero"},
+				Spec: v2alpha2.PodGroupSpec{
+					SubGroups: []v2alpha2.SubGroup{
+						{Name: "workers", Parent: nil, MinMember: 3},
+						{Name: "default", Parent: nil, MinMember: 0},
+					},
+				},
+			},
+			want: &wantGroup{
+				Name:   RootSubGroupSetName,
+				Groups: nil,
+				PodSets: []*wantPodSet{
+					{Name: "workers", MinMember: 3},
+					{Name: "default", MinMember: 0},
+				},
+			},
+		},
+		{
 			name: "empty subgroups",
 			podGroup: &v2alpha2.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{Namespace: "ns5", Name: "empty"},

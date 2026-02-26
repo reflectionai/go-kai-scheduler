@@ -14,7 +14,10 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	"github.com/ray-project/kuberay/ray-operator/controllers/ray/utils"
+
 	schedulingv2alpha2 "github.com/NVIDIA/KAI-scheduler/pkg/apis/scheduling/v2alpha2"
+	"github.com/NVIDIA/KAI-scheduler/pkg/podgrouper/podgroup"
 	"github.com/NVIDIA/KAI-scheduler/pkg/podgrouper/podgrouper/plugins/defaultgrouper"
 )
 
@@ -439,14 +442,16 @@ func TestGetPodGroupMetadata_RayCluster_SubGroups_Default(t *testing.T) {
 	// MinAvailable: 1 (head) + 2 (group0 minReplicas) + 1 (group1 minReplicas) = 4
 	assert.Equal(t, int32(4), podGroupMetadata.MinAvailable)
 
-	// Verify subgroups: head + 2 worker groups
-	assert.Equal(t, 3, len(podGroupMetadata.SubGroups))
+	// Verify subgroups: head + 2 worker groups + default
+	assert.Equal(t, 4, len(podGroupMetadata.SubGroups))
 	assert.Equal(t, "headgroup", podGroupMetadata.SubGroups[0].Name)
 	assert.Equal(t, int32(1), podGroupMetadata.SubGroups[0].MinAvailable)
 	assert.Equal(t, "worker-group-0", podGroupMetadata.SubGroups[1].Name)
 	assert.Equal(t, int32(2), podGroupMetadata.SubGroups[1].MinAvailable)
 	assert.Equal(t, "worker-group-1", podGroupMetadata.SubGroups[2].Name)
 	assert.Equal(t, int32(1), podGroupMetadata.SubGroups[2].MinAvailable)
+	assert.Equal(t, "default", podGroupMetadata.SubGroups[3].Name)
+	assert.Equal(t, int32(0), podGroupMetadata.SubGroups[3].MinAvailable)
 }
 
 func TestGetPodGroupMetadata_RayCluster_SubGroups_NamedWorkerGroups(t *testing.T) {
@@ -462,14 +467,16 @@ func TestGetPodGroupMetadata_RayCluster_SubGroups_NamedWorkerGroups(t *testing.T
 	// MinAvailable: 1 (head) + 2 (gpu-workers minReplicas) + 1 (cpu-workers minReplicas) = 4
 	assert.Equal(t, int32(4), podGroupMetadata.MinAvailable)
 
-	// Verify subgroups use custom names
-	assert.Equal(t, 3, len(podGroupMetadata.SubGroups))
+	// Verify subgroups use custom names + default
+	assert.Equal(t, 4, len(podGroupMetadata.SubGroups))
 	assert.Equal(t, "headgroup", podGroupMetadata.SubGroups[0].Name)
 	assert.Equal(t, int32(1), podGroupMetadata.SubGroups[0].MinAvailable)
 	assert.Equal(t, "gpu-workers", podGroupMetadata.SubGroups[1].Name)
 	assert.Equal(t, int32(2), podGroupMetadata.SubGroups[1].MinAvailable)
 	assert.Equal(t, "cpu-workers", podGroupMetadata.SubGroups[2].Name)
 	assert.Equal(t, int32(1), podGroupMetadata.SubGroups[2].MinAvailable)
+	assert.Equal(t, "default", podGroupMetadata.SubGroups[3].Name)
+	assert.Equal(t, int32(0), podGroupMetadata.SubGroups[3].MinAvailable)
 }
 
 func TestGetPodGroupMetadata_RayCluster_SuspendedWorkers_SubGroups(t *testing.T) {
@@ -486,12 +493,14 @@ func TestGetPodGroupMetadata_RayCluster_SuspendedWorkers_SubGroups(t *testing.T)
 	assert.Equal(t, int32(3), podGroupMetadata.MinAvailable)
 
 	// Suspended worker group should not create a subgroup
-	// Only head + first (non-suspended) worker group
-	assert.Equal(t, 2, len(podGroupMetadata.SubGroups))
+	// Only head + first (non-suspended) worker group + default
+	assert.Equal(t, 3, len(podGroupMetadata.SubGroups))
 	assert.Equal(t, "headgroup", podGroupMetadata.SubGroups[0].Name)
 	assert.Equal(t, int32(1), podGroupMetadata.SubGroups[0].MinAvailable)
 	assert.Equal(t, "worker-group-0", podGroupMetadata.SubGroups[1].Name)
 	assert.Equal(t, int32(2), podGroupMetadata.SubGroups[1].MinAvailable)
+	assert.Equal(t, "default", podGroupMetadata.SubGroups[2].Name)
+	assert.Equal(t, int32(0), podGroupMetadata.SubGroups[2].MinAvailable)
 }
 
 // Tests for backwards compatibility with existing PodGroups
@@ -516,8 +525,8 @@ func TestGetPodGroupMetadata_BackwardsCompatibility_NoPodGroupExists(t *testing.
 
 	assert.Nil(t, err)
 	assert.Equal(t, int32(4), podGroupMetadata.MinAvailable)
-	// Should have subgroups
-	assert.Equal(t, 3, len(podGroupMetadata.SubGroups))
+	// Should have subgroups (head + 2 worker groups + default)
+	assert.Equal(t, 4, len(podGroupMetadata.SubGroups))
 }
 
 func TestGetPodGroupMetadata_BackwardsCompatibility_ExistingPodGroupWithoutSubGroups(t *testing.T) {
@@ -596,8 +605,8 @@ func TestGetPodGroupMetadata_BackwardsCompatibility_ExistingPodGroupWithSubGroup
 
 	assert.Nil(t, err)
 	assert.Equal(t, int32(4), podGroupMetadata.MinAvailable)
-	// Should have subgroups - already migrated
-	assert.Equal(t, 3, len(podGroupMetadata.SubGroups))
+	// Should have subgroups - already migrated (head + 2 worker groups + default)
+	assert.Equal(t, 4, len(podGroupMetadata.SubGroups))
 }
 
 func TestShouldUseSubGroups_NoPodGroupExists(t *testing.T) {
@@ -649,4 +658,109 @@ func TestShouldUseSubGroups_PodGroupExistsWithSubGroups(t *testing.T) {
 	result := rayGrouper.shouldUseSubGroups("test-ns", "test-pg")
 
 	assert.True(t, result)
+}
+
+func TestAssignRayPodToSubGroup_SubmitterPod(t *testing.T) {
+	// A submitter pod has no ray.io/group label. It should be assigned to "default".
+	submitterPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "rayjob-submitter-12345",
+			Namespace: "test_namespace",
+			// No ray.io/group label
+		},
+	}
+
+	pgMetadata := &podgroup.Metadata{
+		SubGroups: []*podgroup.SubGroupMetadata{
+			{Name: "headgroup", MinAvailable: 1},
+			{Name: "worker-group-0", MinAvailable: 2},
+			{Name: "default", MinAvailable: 0},
+		},
+	}
+
+	err := assignRayPodToSubGroup(submitterPod, pgMetadata)
+	assert.Nil(t, err)
+
+	// Verify the pod was assigned to the "default" subGroup
+	assert.Equal(t, []string{"rayjob-submitter-12345"}, pgMetadata.SubGroups[2].PodsReferences)
+	// Other subgroups should be unaffected
+	assert.Empty(t, pgMetadata.SubGroups[0].PodsReferences)
+	assert.Empty(t, pgMetadata.SubGroups[1].PodsReferences)
+}
+
+func TestAssignRayPodToSubGroup_HeadPod(t *testing.T) {
+	// A head pod has the ray.io/group label set to "headgroup".
+	headPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "raycluster-head-0",
+			Namespace: "test_namespace",
+			Labels: map[string]string{
+				utils.RayNodeGroupLabelKey: utils.RayNodeHeadGroupLabelValue,
+			},
+		},
+	}
+
+	pgMetadata := &podgroup.Metadata{
+		SubGroups: []*podgroup.SubGroupMetadata{
+			{Name: "headgroup", MinAvailable: 1},
+			{Name: "worker-group-0", MinAvailable: 2},
+			{Name: "default", MinAvailable: 0},
+		},
+	}
+
+	err := assignRayPodToSubGroup(headPod, pgMetadata)
+	assert.Nil(t, err)
+	assert.Equal(t, []string{"raycluster-head-0"}, pgMetadata.SubGroups[0].PodsReferences)
+	assert.Empty(t, pgMetadata.SubGroups[1].PodsReferences)
+	assert.Empty(t, pgMetadata.SubGroups[2].PodsReferences)
+}
+
+func TestGetPodGroupMetadata_RayJob_SubmitterPod(t *testing.T) {
+	// End-to-end test: a RayJob submitter pod (no Ray labels) should be assigned to "default" subGroup.
+	owner := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"kind":       "RayJob",
+			"apiVersion": "ray.io/v1alpha1",
+			"metadata": map[string]interface{}{
+				"name":      "test_rayjob",
+				"namespace": "test_namespace",
+				"uid":       "rayjob-uid-1",
+				"labels": map[string]interface{}{
+					"test_label": "test_value",
+				},
+				"annotations": map[string]interface{}{
+					"test_annotation": "test_value",
+				},
+			},
+			"status": map[string]interface{}{
+				"rayClusterName": "test_ray_cluster",
+			},
+		},
+	}
+
+	submitterPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test_rayjob-submitter-12345",
+			Namespace: "test_namespace",
+			// No ray.io/group label — this is a Batch Job submitter pod
+		},
+	}
+
+	client := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(autoScalingRayCluster).Build()
+	rayGrouper := NewRayGrouper(client, defaultgrouper.NewDefaultGrouper(queueLabelKey, nodePoolLabelKey, client))
+	grouper := NewRayJobGrouper(rayGrouper)
+
+	podGroupMetadata, err := grouper.GetPodGroupMetadata(owner, submitterPod)
+
+	assert.Nil(t, err)
+	assert.Equal(t, "RayJob", podGroupMetadata.Owner.Kind)
+	assert.Equal(t, int32(4), podGroupMetadata.MinAvailable)
+
+	// Should have 4 subgroups: head + 2 workers + default
+	assert.Equal(t, 4, len(podGroupMetadata.SubGroups))
+	assert.Equal(t, "default", podGroupMetadata.SubGroups[3].Name)
+	assert.Equal(t, int32(0), podGroupMetadata.SubGroups[3].MinAvailable)
+
+	// Submitter pod should be in the "default" subGroup
+	assert.Equal(t, []string{"test_rayjob-submitter-12345"}, podGroupMetadata.SubGroups[3].PodsReferences)
 }
