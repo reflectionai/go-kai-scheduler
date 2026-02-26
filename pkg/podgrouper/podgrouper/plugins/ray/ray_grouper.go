@@ -27,6 +27,10 @@ const (
 	rayClusterKind = "RayCluster"
 
 	rayPriorityClassName = "ray.io/priority-class-name"
+
+	// Must match the scheduler's DefaultSubGroup ("default") so that pods
+	// without an explicit subgroup label land in a valid PodSet.
+	defaultSubGroup = "default"
 )
 
 type RayGrouper struct {
@@ -101,7 +105,10 @@ func (rg *RayGrouper) getPodGroupMetadataWithClusterNamePath(
 func assignRayPodToSubGroup(pod *v1.Pod, pgMetadata *podgroup.Metadata) error {
 	group, found := pod.Labels[utils.RayNodeGroupLabelKey]
 	if !found {
-		return fmt.Errorf("ray node group label (%s) not found on pod %s/%s", utils.RayNodeGroupLabelKey, pod.Namespace, pod.Name)
+		// Pods without a ray node group label (e.g. KubeRay submitter pods)
+		// are assigned to the "default" catch-all subgroup so they can still
+		// be scheduled by KAI.
+		group = defaultSubGroup
 	}
 
 	for _, subGroup := range pgMetadata.SubGroups {
@@ -184,6 +191,10 @@ func calcJobNumOfPodsAndSubGroups(topOwner *unstructured.Unstructured) (int32, [
 		{
 			Name:         utils.RayNodeHeadGroupLabelValue,
 			MinAvailable: 1,
+		},
+		{
+			Name:         defaultSubGroup,
+			MinAvailable: 0,
 		},
 	}
 
