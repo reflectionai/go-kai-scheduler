@@ -22,3 +22,7 @@ spec:
   actions:
     {{- toYaml .Values.scheduler.actions | nindent 4 }}
   {{- end }}
+  {{- if .Values.scheduler.args }}
+  args:
+    {{- toYaml .Values.scheduler.args | nindent 4 }}
+  {{- end }}
