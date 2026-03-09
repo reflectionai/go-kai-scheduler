@@ -9,6 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	schedulingv2alpha2 "github.com/NVIDIA/KAI-scheduler/pkg/apis/scheduling/v2alpha2"
@@ -31,32 +32,33 @@ func NewHandler(client client.Client, nodePoolKey string, queueLabelKey string) 
 func (h *Handler) ApplyToCluster(ctx context.Context, pgMetadata Metadata) error {
 	newPodGroup := h.createPodGroupForMetadata(pgMetadata)
 
-	oldPodGroup := &schedulingv2alpha2.PodGroup{}
 	key := types.NamespacedName{
 		Namespace: pgMetadata.Namespace,
 		Name:      pgMetadata.Name,
 	}
-	err := h.client.Get(ctx, key, oldPodGroup)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			err = h.client.Create(ctx, newPodGroup)
+
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		oldPodGroup := &schedulingv2alpha2.PodGroup{}
+		err := h.client.Get(ctx, key, oldPodGroup)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				return h.client.Create(ctx, newPodGroup)
+			}
 			return err
 		}
-		return err
-	}
 
-	newPodGroup = h.ignoreFields(oldPodGroup, newPodGroup)
+		desired := h.ignoreFields(oldPodGroup, newPodGroup)
 
-	// If we got here then oldPodGroup exists - update if necessary
-	if podGroupsEqual(oldPodGroup, newPodGroup) {
-		// The objects are equal - no need to update.
-		return nil
-	}
+		// If we got here then oldPodGroup exists - update if necessary
+		if podGroupsEqual(oldPodGroup, desired) {
+			// The objects are equal - no need to update.
+			return nil
+		}
 
-	updatePodGroup(oldPodGroup, newPodGroup)
+		updatePodGroup(oldPodGroup, desired)
 
-	err = h.client.Update(ctx, oldPodGroup)
-	return err
+		return h.client.Update(ctx, oldPodGroup)
+	})
 }
 
 func (h *Handler) ignoreFields(oldPodGroup, newPodGroup *schedulingv2alpha2.PodGroup) *schedulingv2alpha2.PodGroup {
