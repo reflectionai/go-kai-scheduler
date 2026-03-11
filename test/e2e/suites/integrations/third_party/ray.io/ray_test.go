@@ -115,8 +115,8 @@ var _ = Describe("Ray integration", Ordered, func() {
 			podGroup, err := testCtx.KubeAiSchedClientset.SchedulingV2alpha2().PodGroups(rayJob.Namespace).Get(
 				ctx, podGroupName, metav1.GetOptions{})
 			Expect(err).To(Succeed())
-			Expect(len(podGroup.Spec.SubGroups)).To(Equal(3),
-				"Expected 3 subgroups (1 head + 2 worker groups)")
+			Expect(len(podGroup.Spec.SubGroups)).To(Equal(4),
+				"Expected 4 subgroups (1 head + 1 default + 2 worker groups)")
 		})
 	})
 })
